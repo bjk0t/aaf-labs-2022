@@ -90,7 +90,17 @@ class SQL:
         print(f"Sorry... no table {title} :(")
         return False
 
-    def function_print_table(self, title, vars: list, symbols: list):
+    def function_print_table(self, title, request: str):
+
+        def print_table(titles: list, data: list):
+            if len(data) == 0:
+                table = PrettyTable([title])
+                table.add_row([" --- No items --- "])
+                print(table)
+                return False
+            table = PrettyTable(titles)
+            table.add_rows(data)
+            print(table)
 
         def uniq(lst):
             last = object()
@@ -100,100 +110,127 @@ class SQL:
                 yield item
                 last = item
 
-        try:
-            if len(vars) >= 2:
-                # and_check = None
-                # Складання до списку
-                l = []
-                for table in self.tables:
-                    if str(table) == title:
-                        l += [table.get_titles()]
-                        l += table.get_items()
-                        break
-                pdframe = []
-                for i in range(len(symbols)):
-                    pdframe += [l]
-                s = 0
-                for num_var in range(0, len(vars), 3):
-                    temp_list = []
-                    try:
-                        title_pos = pdframe[s][0].index(vars[num_var])
-                    except ValueError:
-                        pdframe.pop(s)
-                        break
-                    for i in pdframe[s][1:]:
-                        if symbols[s] == "<=":
-                            if i[title_pos] <= vars[num_var + 1]:
-                                temp_list.append(i)
-                        elif symbols[s] == ">=":
-                            if i[title_pos] >= vars[num_var + 1]:
-                                temp_list.append(i)
-                        elif symbols[s] == "=" or symbols[s] == "==":
-                            if i[title_pos] == vars[num_var + 1]:
-                                temp_list.append(i)
-                        elif symbols[s] == "<":
-                            if i[title_pos] < vars[num_var + 1]:
-                                temp_list.append(i)
-                        elif symbols[s] == ">":
-                            if i[title_pos] > vars[num_var + 1]:
-                                temp_list.append(i)
-                        else:
-                            continue
-                    pdframe[s] = temp_list
-                    s += 1
-                data = []
-                and_check = False
-                for num in range(vars.count("OR") + vars.count("AND") + 1):
-                    # print(pdframe)
-                    # [
-                    # [['2', 'Pushok', 'Fish'], ['3', 'X', 'xxx']],
-                    # [['2', 'Pushok', 'Fish']],
-                    # [['2', 'Pushok', 'Fish']]
-                    # ]
-                    temp_data_1 = data
-                    temp_data_2 = pdframe[num]
-                    if and_check:
-                        for global_item in temp_data_1:
-                            check = True
-                            for temp_items in temp_data_2:
-                                if global_item not in temp_items:
-                                    check = False
-                            if check:
-                                temp_data_2.append(global_item)
-                        data = temp_data_2
+        def logic(title, vars: list, symbols: list):
+            try:
+                if len(vars) >= 2:
+                    # and_check = None
+                    # Складання до списку
+                    l = []
+                    for table in self.tables:
+                        if str(table) == title:
+                            l += [table.get_titles()]
+                            l += table.get_items()
+                            break
+                    pdframe = []
+                    for i in range(len(symbols)):
+                        pdframe += [l]
+                    s = 0
+                    for num_var in range(0, len(vars), 3):
+                        temp_list = []
+                        try:
+                            title_pos = pdframe[s][0].index(vars[num_var])
+                        except ValueError:
+                            pdframe.pop(s)
+                            break
+                        for i in pdframe[s][1:]:
+                            if symbols[s] == "<=":
+                                if i[title_pos] <= vars[num_var + 1]:
+                                    temp_list.append(i)
+                            elif symbols[s] == ">=":
+                                if i[title_pos] >= vars[num_var + 1]:
+                                    temp_list.append(i)
+                            elif symbols[s] == "=" or symbols[s] == "==":
+                                if i[title_pos] == vars[num_var + 1]:
+                                    temp_list.append(i)
+                            elif symbols[s] == "<":
+                                if i[title_pos] < vars[num_var + 1]:
+                                    temp_list.append(i)
+                            elif symbols[s] == ">":
+                                if i[title_pos] > vars[num_var + 1]:
+                                    temp_list.append(i)
+                            else:
+                                continue
+                        pdframe[s] = temp_list
+                        s += 1
+                    # print(pdframe[0])
+                    return pdframe[0]
+                return []
+            except ZeroDivisionError:
+                return []
+
+        def logic_and_or(table_1: list, table_2: list, AND: bool):
+            if AND:
+                new_table = []
+                for item in table_1:
+                    check = True
+                    for items in table_2:
+                        if item not in items:
+                            check = False
+                    if check:
+                        new_table.append(item)
+                return new_table
+            else:
+                table_2 += table_1
+                return [el for el, _ in groupby(table_2)]
+
+        # -------------------------------------------------------------
+
+        OPERATORS = {'<': (1, lambda x, y: logic(title, [x, y], ['<'])), '>': (1, lambda x, y: logic(title, [x, y], ['>'])),
+                     '=': (2, lambda x, y: logic(title, [x, y], ['='])),
+                     '|': (3, lambda x, y: logic_and_or(x, y, False)), '&': (3, lambda x, y: logic_and_or(x, y, True))}
+
+        def eval_(formula):
+            def parse(formula_string):
+                number = ''
+                for s in formula_string:
+                    if s in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890,._':
+                        number += s
+                    elif number:
+                        yield number
+                        number = ''
+                    if s in OPERATORS or s in "()":
+                        yield s
+                if number:
+                    yield number
+
+            def shunting_yard(parsed_formula):
+                stack = []
+                for token in parsed_formula:
+                    if token in OPERATORS:
+                        while stack and stack[-1] != "(" and OPERATORS[token][0] <= OPERATORS[stack[-1]][0]:
+                            yield stack.pop()
+                        stack.append(token)
+                    elif token == ")":
+                        while stack:
+                            x = stack.pop()
+                            if x == "(":
+                                break
+                            yield x
+                    elif token == "(":
+                        stack.append(token)
                     else:
-                        temp_data_2 += temp_data_1
-                        data = [el for el, _ in groupby(temp_data_2)]
+                        yield token
+                while stack:
+                    yield stack.pop()
 
-                    vars = vars[2:]
+            def calc(polish):
+                stack = []
+                for token in polish:
+                    if token in OPERATORS:
+                        y, x = stack.pop(), stack.pop()
+                        stack.append(OPERATORS[token][1](x, y))
+                        print(f"Logic: {stack}")
+                    else:
+                        stack.append(token)
+                return stack[0]
 
-                    # print(f"DATA: {data}")
-                    # print(vars)
-                    # print(and_check)
+            return calc(shunting_yard(parse(formula)))
 
-                    # if vars.count("OR") != 0 and
-                    if vars:
-                        if "OR" == vars[0]:
-                            and_check = False
-                            vars.pop(vars.index("OR"))
-                        elif "AND" == vars[0]:
-                            vars.pop(vars.index("AND"))
-                            and_check = True
-                        else:
-                            pass
-
-                if len(data) == 0:
-                    table = PrettyTable([title])
-                    table.add_row([" --- No items --- "])
-                    print(table)
-                    return False
-                table = PrettyTable(l[0])
-                # print(data)
-                table.add_rows(data)
-                print(table)
-            return False
-        except ZeroDivisionError:
-            print(f"Sorry... Check your input! :(")
+        # ------------------------------------------------------------
+        for table in self.tables:
+            if str(table) == title:
+                print_table(table.get_titles(), eval_(request.replace("AND", "&").replace("and", "&").replace("or", "|").replace("OR", "|")))
+                break
 
     def get_tables(self):
         return self.tables
@@ -208,10 +245,5 @@ class SQL:
 if __name__ == '__main__':
     with open("MySQL.pickle", 'rb') as f:
         MySQL = pickle.load(f)
-    MySQL.print_table("cats")
-    MySQL.function_print_table("cats", ['name', 'Pushok', 'AND', 'name', 'Pushok', 'OR', 'name', 'Murzik'],
-                               ['=', '=', '<'])
-    MySQL.function_print_table("cats", ['name', 'Murzik', 'OR', 'name', 'Pushok', 'AND', 'name', 'Pushok'],
-                               ['>', '=', '='])
-    MySQL.function_print_table("cats", ['name', 'Murzik', 'OR', 'name', 'AAA'],
-                               ['>', '='])
+    MySQL.print_table("t")
+    MySQL.function_print_table("t", "(a < mmm) AND (b = mmm)")

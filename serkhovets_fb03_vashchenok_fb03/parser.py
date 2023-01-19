@@ -60,31 +60,25 @@ pattern_nums = ["[a-zA-Z][a-zA-Z0-9_]*", "(\".+?\")|([a-zA-Z][a-zA-Z0-9_]*)", "[
 pattern = [create, create_i, insert, select, select_i, tables, save, pattern_exit]
 
 
-def pattern_sort(post):
-    p = post[post.find("WHERE") + 6:].replace(";", "")
-    patt_sort = re.compile("([(][(][^(]*[oO][rR][^)]*[)][)])|([(][(][^(]*[aA][nN][dD][^)]*[)][)])")
-    temp = re.findall(patt_sort, p)
-
-    temp_post = p
-
-    if not temp:
-        return p
-
-    if temp[0][0] == "":
-        p = temp[0][1]
-    else:
-        p = temp[0][0]
-
-    temp_post = temp_post.replace(p, "")
-
-    if "or" in temp_post.lower():
-        p += " OR "
-    elif "and" in temp_post.lower():
-        p += " AND "
-
-    temp_post = temp_post[temp_post.find("("):temp_post.find(")")]
-    p += temp_post
-    return p
+# def pattern_sort(post):
+#     p = post[post.find("WHERE") + 6:].replace(";", "")
+#     patt_sort = re.compile("([(][(][^(]*[oO][rR][^)]*[)][)])|([(][(][^(]*[aA][nN][dD][^)]*[)][)])")
+#     temp = re.findall(patt_sort, p)
+#     temp_post = p
+#     if not temp:
+#         return p
+#     if temp[0][0] == "":
+#         p = temp[0][1]
+#     else:
+#         p = temp[0][0]
+#     temp_post = temp_post.replace(p, "")
+#     if "or" in temp_post.lower():
+#         p += " OR "
+#     elif "and" in temp_post.lower():
+#         p += " AND "
+#     temp_post = temp_post[temp_post.find("("):temp_post.find(")")]
+#     p += temp_post
+#     return p
 
 
 def parsing(command: str):
@@ -118,12 +112,10 @@ def parsing(command: str):
                 else:
                     inserted = inserted[1:]
                 pos = MySQL.get_table(inserted[0][1])
-                # print(inserted[1:])
                 if pos is not False:
                     newlist = []
                     for item in inserted[1:]:
                         newlist.append(str(item[0]).replace('"', ""))
-                        # print(str(item[0]).replace('"', ""))
                     pos.add_items(newlist)
                     print("You have made changes to the database. Rows affected: 1")
                 else:
@@ -137,14 +129,11 @@ def parsing(command: str):
                 return 0
             # SELECT table WHERE
             elif i == 4:
-                command_sort = pattern_sort(command)
-                selected = re.findall(pattern_nums[2], command_sort)
+                command_args = command[command.upper().find("WHERE") + 6:].replace(";", "")
+#                command_args = command_args[command_args.find("where") + 6:].replace(";", "")
                 # print(selected)
                 print("Info from 'SELECT':")
-                print(re.findall(pattern_nums[2], command)[2], selected,
-                                           re.findall(re.compile(">=|<=|=|>|<"), command_sort))
-                MySQL.function_print_table(re.findall(pattern_nums[2], command)[2], selected,
-                                           re.findall(re.compile(">=|<=|=|>|<"), command_sort))
+                MySQL.function_print_table(re.findall(pattern_nums[2], command)[2], command_args)
                 return 0
             elif i == 5:
                 MySQL.print_tables()
@@ -174,6 +163,11 @@ def parsing(command: str):
 
 
 if __name__ == '__main__':
-    command = "create t (a, b);"
-    created = re.findall(pattern_nums[0], command)
-    MySQL + Table(created[1], created[2:])
+    # command = "create t (a, b);"
+    # created = re.findall(pattern_nums[0], command)
+    # MySQL + Table(created[1], created[2:])
+    command = "SELECT FROM t WHERE ((a = daa) OR (c = bcc)) AND (( c = bcc) AND (b = abb)) AND (( c = bcc) AND (b = abb));"
+    command_args = command[command.find("WHERE") + 6:].replace(";", "")
+    # print(selected)
+    print("Info from 'SELECT':")
+    MySQL.function_print_table(re.findall(pattern_nums[2], command)[2], command_args)
